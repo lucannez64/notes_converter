@@ -1,12 +1,19 @@
+use rayon::prelude::*;
+use regex::Regex;
 use std::fs::{self, File};
 use std::io::{self, BufRead, BufReader, Write};
 use std::process::Command;
-use regex::Regex;
-use rayon::prelude::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let files = fs::read_dir(".")?
         .filter_map(|entry| entry.ok())
+        .filter(|entry| {
+            !entry
+                .path()
+                .to_str()
+                .unwrap_or_default()
+                .ends_with(".comp.md")
+        })
         .filter(|entry| entry.path().extension().map_or(false, |ext| ext == "md"))
         .collect::<Vec<_>>();
 
@@ -30,11 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         match command_output {
             Ok(output) if output.status.success() => {
                 if let Err(err) = add_header_to_file(&output_path) {
-                    eprintln!(
-                        "Failed to add header to file {}: {}",
-                        output_path,
-                        err
-                    );
+                    eprintln!("Failed to add header to file {}: {}", output_path, err);
                 }
             }
             Ok(output) => {
@@ -67,11 +70,7 @@ fn add_header_to_file(file_path: &str) -> io::Result<()> {
     let temp_file_path = format!("{}.temp", file_path);
     let mut output_file = File::create(&temp_file_path)?;
 
-    let file_name = Path::new(file_path)
-        .file_stem()
-        .unwrap()
-        .to_str()
-        .unwrap();
+    let file_name = Path::new(file_path).file_stem().unwrap().to_str().unwrap();
 
     let date = Local::now();
     let date_str = format!(
@@ -94,35 +93,37 @@ fn add_header_to_file(file_path: &str) -> io::Result<()> {
         },
         date.year(),
     );
-
+    let title = file_name.replace("_", " ");
     writeln!(output_file, "#import \"template.typ\": *\n")?;
-    writeln!(output_file, "// Take a look at the file `template.typ` in the file panel")?;
-    writeln!(output_file, "// to customize this template and discover how it works.")?;
+    writeln!(
+        output_file,
+        "// Take a look at the file `template.typ` in the file panel"
+    )?;
+    writeln!(
+        output_file,
+        "// to customize this template and discover how it works."
+    )?;
     writeln!(
         output_file,
         "#show: project.with(\n  title: \"{}\",\n  authors: (\n    \"Lucas\",\n  ),\n  date: \"{}\",\n)\n",
-        file_name, date_str
+        title, date_str
     )?;
     writeln!(output_file, "#set heading(numbering: \"1.1.\")\n")?;
     let pattern = Regex::new(r#"#link\("(.*?)\.md"\)"#).unwrap();
     for line in input_lines {
         let line = line?;
         let new_line = pattern.replace_all(&line, "#link(\"$1.pdf\")");
+        let new_line = new_line.replace("\\#pagebreak", "#pagebreak");
         let spaced_line = new_line.replace("%20", " ");
         writeln!(output_file, "{}", spaced_line)?;
     }
     fs::rename(&temp_file_path, file_path)?;
-    
-        let typst_command_output = Command::new("typst")
-        .arg(file_path)
-        .output();
+
+    let typst_command_output = Command::new("typst").arg("compile").arg(file_path).output();
 
     match typst_command_output {
         Ok(output) if output.status.success() => {
-            println!(
-                "File {} successfully compiled with typst.",
-                file_path
-            );
+            println!("File {} successfully compiled with typst.", file_path);
         }
         Ok(output) => {
             eprintln!(
@@ -132,15 +133,9 @@ fn add_header_to_file(file_path: &str) -> io::Result<()> {
             );
         }
         Err(err) => {
-            eprintln!(
-                "Failed to run typst on file {}: {}",
-                file_path,
-                err
-            );
+            eprintln!("Failed to run typst on file {}: {}", file_path, err);
         }
     }
 
     Ok(())
 }
-
-
