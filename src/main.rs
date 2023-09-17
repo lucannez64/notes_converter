@@ -105,7 +105,7 @@ fn add_header_to_file(file_path: &str) -> io::Result<()> {
     )?;
     writeln!(
         output_file,
-        "#show: project.with(\n  title: \"{}\",\n  authors: (\n    \"Lucas\",\n  ),\n  date: \"{}\",\n)\n",
+        "#show: project.with(\n  title: \"{}\",\n  authors: (\n    \"Lucas Duchet-Annez\",\n  ),\n  date: \"{}\",\n)\n",
         title, date_str
     )?;
     writeln!(output_file, "#set heading(numbering: \"1.1.\")\n")?;
