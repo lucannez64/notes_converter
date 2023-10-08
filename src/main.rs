@@ -1,9 +1,9 @@
 use rayon::prelude::*;
+use regex::Captures;
 use regex::Regex;
 use std::fs::{self, File};
 use std::io::{self, BufRead, BufReader, Write};
 use std::process::Command;
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let files = fs::read_dir(".")?
         .filter_map(|entry| entry.ok())
@@ -110,13 +110,33 @@ fn add_header_to_file(file_path: &str) -> io::Result<()> {
     )?;
     writeln!(output_file, "#set heading(numbering: \"1.1.\")\n")?;
     let pattern = Regex::new(r#"#link\("(.*?)\.md"\)"#).unwrap();
+    let sys_re = Regex::new(r"systemequation \$([^\n|\$]*)\$\s*\n\s*\$([^\n|\$]*)\$").unwrap();
+    let mut lines = Vec::new();
+
     for line in input_lines {
-        let line = line?;
+        lines.push(line?);
+    }
+    let text = lines.join("\n");
+    let replaced = sys_re.replace_all(&text, |caps: &Captures| {
+        let x = format!("$cases({}, {})$", caps[1].to_owned(), caps[2].to_owned());
+        println!("{} {}", caps[1].to_owned(), caps[2].to_owned());
+        println!("{}", x);
+        x
+    });
+    lines = replaced.lines().map(|l| l.to_string()).collect();
+
+    for line in &lines {
         let new_line = pattern.replace_all(&line, "#link(\"$1.pdf\")");
         let new_line = new_line.replace("\\#pagebreak", "#pagebreak");
         let spaced_line = new_line.replace("%20", " ");
-        writeln!(output_file, "{}", spaced_line)?;
+        let sys_re = Regex::new(r"systemequation \$([^\n]*)\$ \$([^\n]*)\$").unwrap();
+
+        let replaced = sys_re.replace_all(&spaced_line, |caps: &Captures| {
+            format!("$cases({}, {})$", &caps[1], &caps[2])
+        });
+        writeln!(output_file, "{}", replaced)?;
     }
+
     fs::rename(&temp_file_path, file_path)?;
 
     let typst_command_output = Command::new("typst").arg("compile").arg(file_path).output();
