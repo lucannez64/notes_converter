@@ -3,19 +3,42 @@ use regex::Captures;
 use regex::Regex;
 use std::fs::{self, File};
 use std::io::{self, BufRead, BufReader, Write};
+use std::path::PathBuf;
 use std::process::Command;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let files = fs::read_dir(".")?
-        .filter_map(|entry| entry.ok())
-        .filter(|entry| {
-            !entry
-                .path()
-                .to_str()
-                .unwrap_or_default()
-                .ends_with(".comp.md")
-        })
-        .filter(|entry| entry.path().extension().map_or(false, |ext| ext == "md"))
-        .collect::<Vec<_>>();
+    let args: Vec<String> = std::env::args().collect();
+
+    let mut filename = None;
+
+    if args.len() > 1 {
+        if args[1] == "--single-file" {
+            if args.len() > 2 {
+                let x = args[2].clone().replace("D:\\Notes\\", ".\\");
+                println!("{}", x);
+                filename = Some(x);
+            } else {
+                eprintln!("--single-file requires a filename argument");
+                std::process::exit(1);
+            }
+        }
+    }
+    let files = match filename {
+        Some(f) => fs::read_dir(".")?
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| entry.path() == PathBuf::from(&f))
+            .collect::<Vec<_>>(),
+        None => fs::read_dir(".")?
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| {
+                !entry
+                    .path()
+                    .to_str()
+                    .unwrap_or_default()
+                    .ends_with(".comp.md")
+            })
+            .filter(|entry| entry.path().extension().map_or(false, |ext| ext == "md"))
+            .collect::<Vec<_>>(),
+    };
 
     files.par_iter().for_each(|file| {
         let file_path = file.path();
@@ -119,8 +142,6 @@ fn add_header_to_file(file_path: &str) -> io::Result<()> {
     let text = lines.join("\n");
     let replaced = sys_re.replace_all(&text, |caps: &Captures| {
         let x = format!("$cases({}, {})$", caps[1].to_owned(), caps[2].to_owned());
-        println!("{} {}", caps[1].to_owned(), caps[2].to_owned());
-        println!("{}", x);
         x
     });
     lines = replaced.lines().map(|l| l.to_string()).collect();
