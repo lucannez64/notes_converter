@@ -164,9 +164,7 @@ fn add_header_to_file(file_path: &str) -> io::Result<()> {
     let typst_command_output = Command::new("typst").arg("compile").arg(file_path).output();
 
     match typst_command_output {
-        Ok(output) if output.status.success() => {
-            println!("File {} successfully compiled with typst.", file_path);
-        }
+        Ok(output) if output.status.success() => {}
         Ok(output) => {
             eprintln!(
                 "Failed to compile file {} with typst: {}",
