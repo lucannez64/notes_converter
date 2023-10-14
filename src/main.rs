@@ -9,13 +9,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
 
     let mut filename = None;
-
+    let cwd = std::env::current_dir()?;
     if args.len() > 1 {
         if args[1] == "--single-file" {
             if args.len() > 2 {
-                let x = args[2].clone().replace("D:\\Notes\\", ".\\");
-                println!("{}", x);
-                filename = Some(x);
+                filename = Some(PathBuf::from(args[2].clone()));
             } else {
                 eprintln!("--single-file requires a filename argument");
                 std::process::exit(1);
@@ -25,7 +23,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let files = match filename {
         Some(f) => fs::read_dir(".")?
             .filter_map(|entry| entry.ok())
-            .filter(|entry| entry.path() == PathBuf::from(&f))
+            .filter(|entry| {
+                entry.path()
+                    == Path::new(".\\").join(f.strip_prefix(&cwd).unwrap_or(&f).to_str().unwrap())
+            })
             .collect::<Vec<_>>(),
         None => fs::read_dir(".")?
             .filter_map(|entry| entry.ok())
